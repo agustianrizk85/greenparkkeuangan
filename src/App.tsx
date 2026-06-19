@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { DashboardData, Project, Summary } from "./types";
+import type { Dashboard, ProjectFin } from "./types";
 import { api } from "./api/client";
 import { useAuth } from "./hooks/useAuth";
 import type { Auth } from "./hooks/useAuth";
@@ -10,15 +10,18 @@ import { useLogo } from "./hooks/useLogo";
 import { Clock } from "./components/Clock";
 import { Icon } from "./components/Icon";
 import { Login } from "./components/Login";
-import { Admin } from "./components/admin/Admin";
+import { ImportPanel } from "./components/admin/ImportPanel";
 import {
   AiDecisionPanel,
-  CashflowPanel,
-  FundingPanel,
+  AlertPanel,
+  BankPanel,
+  FunnelPanel,
   KpiRow,
-  PayablePanel,
+  MonthlyPanel,
+  PayMixPanel,
+  PipelinePanel,
   ProjectPanel,
-  ReceivablePanel,
+  SalesPanel,
 } from "./components/panels";
 import { FOCUS_META, ProjectDetail } from "./components/focus";
 
@@ -26,22 +29,20 @@ interface TabDef {
   id: string;
   label: string;
   icon: string;
-  alert?: boolean;
 }
 
 const TABS: TabDef[] = [
   { id: "overview", label: "Overview", icon: "grid" },
-  { id: "project", label: "Proyek P&L", icon: "building" },
-  { id: "receivable", label: "Piutang", icon: "receipt", alert: true },
-  { id: "payable", label: "Hutang", icon: "wallet" },
-  { id: "cost", label: "Struktur Biaya", icon: "pie" },
-  { id: "funding", label: "Pendanaan", icon: "bank" },
+  { id: "project", label: "Proyek", icon: "building" },
+  { id: "bank", label: "Pendanaan", icon: "bank" },
+  { id: "pipeline", label: "Pipeline KPR", icon: "filter" },
+  { id: "cashflow", label: "Tren Akad", icon: "trend" },
   { id: "ai", label: "AI & Decision", icon: "cpu" },
   { id: "kpi", label: "KPI", icon: "trend" },
   { id: "triggers", label: "Early Warning", icon: "filter" },
 ];
 
-type Modal = { kind: "focus"; key: string } | { kind: "project"; p: Project };
+type Modal = { kind: "focus"; key: string } | { kind: "project"; p: ProjectFin };
 
 export function App() {
   const auth = useAuth();
@@ -64,12 +65,13 @@ function AuthedApp({ auth }: { auth: Auth }) {
   useScale();
   const [state, reload] = useDashboard(auth.expire);
   const [view, setView] = useState<"dash" | "admin">("dash");
+  useRealtime(reload);
 
   if (state.status === "loading") {
     return (
       <Splash>
         <div className="spinner" />
-        Memuat data finance…
+        Memuat data keuangan…
       </Splash>
     );
   }
@@ -91,11 +93,49 @@ function AuthedApp({ auth }: { auth: Auth }) {
     return (
       <>
         <AdminHeader auth={auth} onBack={() => setView("dash")} />
-        <Admin data={state.data} reload={reload} />
+        <div className="body">
+          <ImportPanel reload={reload} />
+        </div>
       </>
     );
   }
-  return <Dashboard D={state.data} auth={auth} onOpenAdmin={isAdmin ? () => setView("admin") : undefined} />;
+  return <DashboardView D={state.data} auth={auth} onOpenAdmin={isAdmin ? () => setView("admin") : undefined} />;
+}
+
+/** Subscribe to backend revision pushes (WebSocket) and reload on change. */
+function useRealtime(reload: () => void) {
+  const reloadRef = useRef(reload);
+  reloadRef.current = reload;
+  useEffect(() => {
+    const url = api.realtimeURL();
+    if (!url) return;
+    let ws: WebSocket | null = null;
+    let timer: number | undefined;
+    let closed = false;
+    let lastRev = -1;
+    const connect = () => {
+      if (closed) return;
+      ws = new WebSocket(url);
+      ws.onmessage = (e) => {
+        try {
+          const { rev } = JSON.parse(e.data) as { rev: number };
+          if (lastRev >= 0 && rev !== lastRev) reloadRef.current();
+          lastRev = rev;
+        } catch {
+          /* ignore */
+        }
+      };
+      ws.onclose = () => {
+        if (!closed) timer = window.setTimeout(connect, 5000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      if (timer) window.clearTimeout(timer);
+      ws?.close();
+    };
+  }, []);
 }
 
 function Splash({ tone, children }: { tone?: "error"; children: ReactNode }) {
@@ -112,7 +152,7 @@ function Tools({ auth, onOpenAdmin, onBack }: { auth: Auth; onOpenAdmin?: () => 
       )}
       {onOpenAdmin && (
         <button className="hdr-tool-btn" onClick={onOpenAdmin}>
-          ⚙ Master Data
+          🔄 Sync / Import
         </button>
       )}
       <span className="hdr-user">
@@ -131,14 +171,14 @@ function AdminHeader({ auth, onBack }: { auth: Auth; onBack: () => void }) {
     <header className="hdr">
       <div className="hdr-logo">
         <span>
-          Master
+          Sync
           <br />
           Data
         </span>
       </div>
       <div className="hdr-titles">
-        <h1>MASTER DATA · INPUT &amp; KELOLA</h1>
-        <div className="sub">Perubahan langsung tampil di dashboard setelah disimpan</div>
+        <h1>SINKRONISASI DATA KEUANGAN</h1>
+        <div className="sub">Sync Google Sheets / Upload Excel → Preview → Approve</div>
         <div className="tag">FINANCE GREENPARK GROUP</div>
       </div>
       <span className="hdr-spacer" />
@@ -149,71 +189,35 @@ function AdminHeader({ auth, onBack }: { auth: Auth; onBack: () => void }) {
   );
 }
 
-function Dashboard({ D, auth, onOpenAdmin }: { D: DashboardData; auth: Auth; onOpenAdmin?: () => void }) {
+function DashboardView({ D, auth, onOpenAdmin }: { D: Dashboard; auth: Auth; onOpenAdmin?: () => void }) {
   const [logo, onLogoDrop] = useLogo();
   const [tab, setTab] = useState<string>(() => localStorage.getItem("gp_fin_tab") ?? "overview");
-  const [filter, setFilter] = useState<string>("all");
   const [modal, setModal] = useState<Modal | null>(null);
 
   useEffect(() => {
     try {
       localStorage.setItem("gp_fin_tab", tab);
     } catch {
-      /* ignore storage errors */
+      /* ignore */
     }
   }, [tab]);
 
-  // Filtered data set (by project) — derived KPIs recomputed client-side.
-  const data: DashboardData = useMemo(() => {
-    if (filter === "all") return D;
-    const proj = D.projects.find((p) => p.id === filter);
-    const projects = D.projects.filter((p) => p.id === filter);
-    const name = proj ? proj.name : "";
-    const receivables = D.receivables.filter((r) => r.project === name);
-    const payables = D.payables.filter((p) => p.project === name);
-    const totalRevenue = projects.reduce((sum, p) => sum + p.revenue, 0);
-    const collected = projects.reduce((sum, p) => sum + p.collected, 0);
-    const weightedMargin = projects.reduce((sum, p) => sum + p.margin * p.revenue, 0);
-    const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0);
-    const totalSpent = projects.reduce((sum, p) => sum + p.spent, 0);
-    const outstandingAR = receivables.reduce((sum, r) => sum + r.amount, 0);
-    const outstandingAP = payables.reduce((sum, p) => sum + p.amount, 0);
-    const critical = receivables.filter((r) => r.bucket === "d90").length;
-    const summary: Summary = {
-      ...D.summary,
-      totalRevenue,
-      collected,
-      collectionRate: totalRevenue ? Math.round((collected / totalRevenue) * 100) : 0,
-      outstandingAR,
-      outstandingAP,
-      netMargin: totalRevenue ? Math.round(weightedMargin / totalRevenue) : 0,
-      budgetAbsorption: totalBudget ? Math.round((totalSpent / totalBudget) * 100) : 0,
-      critical,
-    };
-    return {
-      ...D,
-      projects,
-      receivables: receivables.length ? receivables : D.receivables,
-      payables: payables.length ? payables : D.payables,
-      summary,
-    };
-  }, [filter, D]);
-
+  const flagged = D.pipeline.filter((r) => r.kendala).length;
   const openFocus = (key: string) => setModal({ kind: "focus", key });
-  const openProject = (p: Project) => setModal({ kind: "project", p });
+  const openProject = (p: ProjectFin) => setModal({ kind: "project", p });
 
   return (
     <>
-      <Header logo={logo} onLogoDrop={onLogoDrop} auth={auth} onOpenAdmin={onOpenAdmin} />
-      <Tabs tab={tab} setTab={setTab} data={D} filter={filter} setFilter={setFilter} critical={data.summary.critical} />
+      <Header logo={logo} onLogoDrop={onLogoDrop} auth={auth} onOpenAdmin={onOpenAdmin} D={D} />
+      <Tabs tab={tab} setTab={setTab} pipelineAlert={flagged} />
       <div className="body">
         {tab === "overview" ? (
-          <Overview data={data} openFocus={openFocus} openProject={openProject} />
+          <Overview D={D} openFocus={openFocus} openProject={openProject} />
         ) : (
-          <FocusBody tabKey={tab} data={data} />
+          <FocusBody tabKey={tab} D={D} />
         )}
       </div>
-      {modal && <ModalView modal={modal} data={data} onClose={() => setModal(null)} />}
+      {modal && <ModalView modal={modal} D={D} onClose={() => setModal(null)} />}
     </>
   );
 }
@@ -223,50 +227,30 @@ function Header({
   onLogoDrop,
   auth,
   onOpenAdmin,
+  D,
 }: {
   logo: string;
   onLogoDrop: (e: React.DragEvent) => void;
   auth: Auth;
   onOpenAdmin?: () => void;
+  D: Dashboard;
 }) {
   return (
     <header className="hdr">
-      <div
-        className="hdr-logo"
-        onDrop={onLogoDrop}
-        onDragOver={(e) => e.preventDefault()}
-        title="Drag & drop logo Greenpark"
-      >
-        {logo ? (
-          <img src={logo} alt="logo" />
-        ) : (
-          <span>
-            Drop
-            <br />
-            Logo
-          </span>
-        )}
+      <div className="hdr-logo" onDrop={onLogoDrop} onDragOver={(e) => e.preventDefault()} title="Drag & drop logo Greenpark">
+        {logo ? <img src={logo} alt="logo" /> : <span>Drop<br />Logo</span>}
       </div>
       <div className="hdr-titles">
-        <h1>DASHBOARD FINANCE GREENPARK GROUP</h1>
-        <div className="sub">One Page CEO Financial Control Dashboard — Cash &amp; Margin Guard System</div>
-        <div className="tag">ONE TEAM · ONE SYSTEM · ONE DASHBOARD · ONE GOAL</div>
+        <h1>DASHBOARD KEUANGAN GREENPARK GROUP</h1>
+        <div className="sub">Akad &amp; KPR Control Tower — {D.period}</div>
+        <div className="tag">{D.updated ? `Diperbarui: ${D.updated}` : "ONE TEAM · ONE SYSTEM · ONE DASHBOARD"}</div>
       </div>
       <span className="hdr-spacer" />
       <div className="hdr-meta">
         <div className="legend">
-          <span className="lg">
-            <span className="dot ok" />
-            Sehat
-          </span>
-          <span className="lg">
-            <span className="dot warn" />
-            Waspada
-          </span>
-          <span className="lg">
-            <span className="dot bad" />
-            Kritis
-          </span>
+          <span className="lg"><span className="dot ok" />Sehat</span>
+          <span className="lg"><span className="dot warn" />Waspada</span>
+          <span className="lg"><span className="dot bad" />Kritis</span>
         </div>
         <Clock />
         <Tools auth={auth} onOpenAdmin={onOpenAdmin} />
@@ -275,73 +259,48 @@ function Header({
   );
 }
 
-function Tabs({
-  tab,
-  setTab,
-  data,
-  filter,
-  setFilter,
-  critical,
-}: {
-  tab: string;
-  setTab: (t: string) => void;
-  data: DashboardData;
-  filter: string;
-  setFilter: (f: string) => void;
-  critical: number;
-}) {
+function Tabs({ tab, setTab, pipelineAlert }: { tab: string; setTab: (t: string) => void; pipelineAlert: number }) {
   return (
     <nav className="tabs">
       {TABS.map((t) => (
         <button key={t.id} className={`tab ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
           <Icon name={t.icon} size={15} />
           {t.label}
-          {t.id === "receivable" && <span className="cnt alert">{critical}</span>}
+          {t.id === "pipeline" && pipelineAlert > 0 && <span className="cnt alert">{pipelineAlert}</span>}
         </button>
       ))}
-      <span className="tabs-spacer" />
-      <select className="filter" value={filter} onChange={(e) => setFilter(e.target.value)} title="Filter proyek">
-        <option value="all">▾ Semua Proyek</option>
-        {data.projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
     </nav>
   );
 }
 
 function Overview({
-  data,
+  D,
   openFocus,
   openProject,
 }: {
-  data: DashboardData;
+  D: Dashboard;
   openFocus: (key: string) => void;
-  openProject: (p: Project) => void;
+  openProject: (p: ProjectFin) => void;
 }) {
   return (
     <>
-      <KpiRow s={data.summary} />
+      <KpiRow s={D.summary} />
       <div className="grid">
-        <CashflowPanel trend={data.cashflowTrend} onExpand={() => openFocus("cashflow")} />
-        <ProjectPanel projects={data.projects} onExpand={() => openFocus("project")} onRow={openProject} />
-        <ReceivablePanel
-          receivables={data.receivables}
-          agingMap={data.agingMap}
-          typeMap={data.receivableTypeMap}
-          onExpand={() => openFocus("receivable")}
-        />
-        <PayablePanel payables={data.payables} priorityMap={data.priorityMap} onExpand={() => openFocus("payable")} />
-        <FundingPanel facilities={data.facilities} onExpand={() => openFocus("funding")} />
-        <AiDecisionPanel insights={data.aiInsights} decisions={data.decisions} onExpand={() => openFocus("ai")} />
+        <FunnelPanel funnel={D.funnel} onExpand={() => openFocus("pipeline")} />
+        <MonthlyPanel monthly={D.monthly} onExpand={() => openFocus("cashflow")} />
+        <ProjectPanel projects={D.projects} onExpand={() => openFocus("project")} onRow={openProject} />
+        <BankPanel banks={D.banks} onExpand={() => openFocus("bank")} />
+        <SalesPanel sales={D.sales} onExpand={() => openFocus("sales")} />
+        <PayMixPanel payMix={D.payMix} />
+        <PipelinePanel pipeline={D.pipeline} onExpand={() => openFocus("pipeline")} />
+        <AlertPanel alerts={D.alerts} />
+        <AiDecisionPanel insights={D.ai} decisions={D.decisions} onExpand={() => openFocus("ai")} />
       </div>
     </>
   );
 }
 
-function FocusBody({ tabKey, data }: { tabKey: string; data: DashboardData }) {
+function FocusBody({ tabKey, D }: { tabKey: string; D: Dashboard }) {
   const meta = FOCUS_META[tabKey];
   if (!meta) return null;
   return (
@@ -352,13 +311,13 @@ function FocusBody({ tabKey, data }: { tabKey: string; data: DashboardData }) {
         <span className="psub">· {meta.sub}</span>
       </header>
       <div className="panel-bd scroll" style={{ gap: 18 }}>
-        {meta.render(data)}
+        {meta.render(D)}
       </div>
     </div>
   );
 }
 
-function ModalView({ modal, data, onClose }: { modal: Modal; data: DashboardData; onClose: () => void }) {
+function ModalView({ modal, D, onClose }: { modal: Modal; D: Dashboard; onClose: () => void }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -372,13 +331,13 @@ function ModalView({ modal, data, onClose }: { modal: Modal; data: DashboardData
   let content: ReactNode;
   if (modal.kind === "project") {
     title = modal.p.name;
-    sub = "Project P&L deep-dive · " + modal.p.pic;
+    sub = "Akad deep-dive · " + modal.p.gp;
     content = <ProjectDetail p={modal.p} />;
   } else {
     const m = FOCUS_META[modal.key];
     title = m.title;
     sub = m.sub;
-    content = m.render(data);
+    content = m.render(D);
   }
 
   return (

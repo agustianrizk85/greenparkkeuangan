@@ -1,7 +1,15 @@
-import type { Dashboard, LoginResponse, Project, User } from "../types";
+import type {
+  AutoSyncStatus,
+  Dashboard,
+  ImportRecord,
+  ImportResult,
+  LoginResponse,
+  User,
+} from "../types";
 
 /** Backend base URL — override with VITE_API_BASE at build/dev time. */
-const BASE = (import.meta.env.VITE_API_BASE ?? "http://localhost:8084") + "/api";
+const ORIGIN = import.meta.env.VITE_API_BASE ?? "http://localhost:8084";
+const BASE = ORIGIN + "/api";
 const TOKEN_KEY = "gp_fin_token";
 
 let token: string | null = localStorage.getItem(TOKEN_KEY);
@@ -25,7 +33,20 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  return handle<T>(res);
+}
 
+/** multipart upload helper for the XLSX import endpoints. */
+async function upload<T>(path: string, file: File): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(BASE + path, { method: "POST", headers, body: fd });
+  return handle<T>(res);
+}
+
+async function handle<T>(res: Response): Promise<T> {
   if (res.status === 401) {
     setToken(null);
     throw new AuthError("Sesi berakhir, silakan login kembali.");
@@ -39,7 +60,6 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     }
     throw new Error(`HTTP ${res.status} ${detail}`.trim());
   }
-  // 204 / empty body guard
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
 }
@@ -47,6 +67,13 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export const api = {
   base: BASE,
   hasToken: () => !!token,
+
+  /** WebSocket URL for realtime revision push (null when logged out). */
+  realtimeURL(): string | null {
+    if (!token) return null;
+    const ws = ORIGIN.replace(/^http/, "ws");
+    return `${ws}/api/ws?token=${encodeURIComponent(token)}`;
+  },
 
   // ---- auth ----
   async login(username: string, password: string): Promise<User> {
@@ -65,13 +92,23 @@ export const api = {
 
   // ---- reads ----
   dashboard: () => req<Dashboard>("GET", "/dashboard"),
-  project: (id: string) => req<Project>("GET", "/projects/" + encodeURIComponent(id)),
+  version: () => req<{ rev: number }>("GET", "/version"),
 
-  // ---- collection writes (POST create/update, DELETE by _id) ----
-  saveEntity: <T>(collection: string, item: T) => req<T>("POST", "/" + collection, item),
-  deleteEntity: (collection: string, id: string) =>
-    req<{ status: string }>("DELETE", `/${collection}/${encodeURIComponent(id)}`),
+  // ---- ingest: upload XLSX ----
+  importPreview: (file: File) => upload<ImportResult>("/import/preview", file),
+  importApprove: (file: File) => upload<ImportRecord>("/import/approve", file),
 
-  // ---- singleton / whole-array writes (PUT) ----
-  putSingleton: <T>(path: string, body: T) => req<T>("PUT", "/" + path, body),
+  // ---- ingest: Google Sheets sync ----
+  syncPreview: () => req<ImportResult>("POST", "/import/sync-preview"),
+  syncApprove: () => req<ImportRecord>("POST", "/import/sync-approve"),
+
+  // ---- auto-sync ----
+  autoStatus: () => req<AutoSyncStatus>("GET", "/import/auto"),
+  autoSet: (enabled: boolean, intervalSec: number) =>
+    req<AutoSyncStatus>("PUT", "/import/auto", { enabled, intervalSec }),
+
+  // ---- history / lifecycle ----
+  importHistory: () => req<ImportRecord[]>("GET", "/import/history"),
+  importReset: () => req<ImportRecord>("POST", "/import/reset"),
+  importRollback: (id: string) => req<ImportRecord>("POST", `/import/rollback/${encodeURIComponent(id)}`),
 };

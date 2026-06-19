@@ -1,92 +1,118 @@
-// Domain types mirroring the Go backend JSON contract (see backend/finance).
-// All monetary values are in millions of Rupiah (Rp juta).
+// Domain types mirroring the Go backend JSON contract (greenparkkeuanganbe).
+// The dashboard is driven by the akad/KPR closing pipeline. All monetary values
+// are in millions of Rupiah (Rp juta).
 
 /** Traffic-light health indicator. */
 export type Status = "green" | "yellow" | "red";
 
 /** Pill / chip colour tones supported by the stylesheet. */
-export type Tone = "green" | "yellow" | "orange" | "red" | "neutral" | "crisis";
+export type Tone = "green" | "yellow" | "orange" | "red" | "neutral" | "crisis" | "navy";
 
-/** SLA / due state shared by receivables and payables. */
-export type SLAState = "ok" | "due" | "overdue";
+export interface Summary {
+  nilaiAkad: number;
+  cashIn: number;
+  pipelineValue: number;
+  akadCount: number;
+  bookingCount: number;
+  prosesCount: number;
+  batalCount: number;
+  cancelRate: number;
+  avgDurasi: number;
+  kprShare: number;
+  targetAkad: number;
+  achievement: number;
+  topProject: string;
+  topBank: string;
+  bankCount: number;
+}
 
-export interface Project {
-  _id: string;
-  id: string;
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface MonthPoint {
+  period: string;
+  akad: number;
+  nilai: number;
+  dp: number;
+}
+
+export interface ProjectFin {
+  code: string;
   name: string;
-  units: number;
-  budget: number;
-  spent: number;
-  revenue: number;
-  collected: number;
-  margin: number;
+  gp: string;
+  akad: number;
+  booking: number;
+  batal: number;
+  nilai: number;
+  dp: number;
+  kprPct: number;
+  topBank: string;
   status: Status;
-  pic: string;
-  cashNote: string;
-  decision: string;
-}
-
-export interface Receivable {
-  _id: string;
-  id: string;
-  project: string;
-  customer: string;
-  type: string;
-  amount: number;
-  aging: number;
-  bucket: string;
-  sla: SLAState;
-  owner: string;
-  next: string;
-}
-
-export interface Payable {
-  _id: string;
-  id: string;
-  vendor: string;
-  project: string;
-  category: string;
-  amount: number;
-  dueDays: number;
-  priority: string;
-  status: SLAState;
   note: string;
 }
 
-export interface Facility {
-  _id: string;
+export interface BankFin {
   name: string;
-  type: string;
-  plafond: number;
-  used: number;
-  rate: number;
-  tenor: string;
+  akad: number;
+  plafon: number;
+  share: number;
   status: Status;
 }
 
-/** Ordered classification item (receivable type / aging bucket / priority). */
-export interface MetaItem {
-  key: string;
-  label: string;
-  tone: Tone;
-  note?: string;
-  sla?: string;
-}
-
-export interface CostCategory {
+export interface SalesRank {
   name: string;
-  budget: number;
-  actual: number;
+  akad: number;
+  nilai: number;
+  isAgent: boolean;
 }
 
-export interface Treasury {
-  cashOnHand: number;
-  restrictedCash: number;
-  monthlyBurn: number;
+export interface PayMethod {
+  type: string;
+  count: number;
+  value: number;
+}
+
+export interface PipelineRow {
+  project: string;
+  customer: string;
+  blok: string;
+  sales: string;
+  bank: string;
+  caraBayar: string;
+  stage: string;
+  stageKey: string;
+  plafon: number;
+  sla: "ok" | "due" | "overdue";
+  kendala: string;
+}
+
+export interface AkadRow {
+  gp: string;
+  project: string;
+  customer: string;
+  blok: string;
+  sales: string;
+  bank: string;
+  caraBayar: string;
+  dp: number;
+  plafon: number;
+  tglAkad: string;
+  bulan: string;
+  tahun: number;
+  durasi: number;
+}
+
+export interface Alert {
+  tone: string;
+  title: string;
+  detail: string;
+  action: string;
 }
 
 export interface AIInsight {
-  _id: string;
   type: string;
   tone: string;
   text: string;
@@ -94,25 +120,16 @@ export interface AIInsight {
 }
 
 export interface Decision {
-  _id: string;
   role: string;
   tone: string;
   text: string;
 }
 
-export interface CashflowPoint {
-  period: string;
-  inflow: number;
-  outflow: number;
-}
-
 export interface KPI {
-  _id: string;
   no: number;
   kpi: string;
   def: string;
   pic: string;
-  upd: string;
   green: string;
   yellow: string;
   red: string;
@@ -121,7 +138,6 @@ export interface KPI {
 }
 
 export interface Trigger {
-  _id: string;
   cond: string;
   thr: string;
   status: string;
@@ -130,44 +146,69 @@ export interface Trigger {
   esc: string;
 }
 
-export interface Summary {
-  totalRevenue: number;
-  cashPosition: number;
-  collected: number;
-  collectionRate: number;
-  outstandingAR: number;
-  outstandingAP: number;
-  netMargin: number;
-  budgetAbsorption: number;
-  runway: number;
-  overdueRisk: string;
-  critical: number;
-}
-
 /** Full payload returned by GET /api/dashboard. */
 export interface Dashboard {
-  projects: Project[];
-  receivables: Receivable[];
-  receivableType: MetaItem[];
-  agingMeta: MetaItem[];
-  payables: Payable[];
-  priorityMeta: MetaItem[];
-  facilities: Facility[];
-  costStructure: CostCategory[];
-  treasury: Treasury;
-  aiInsights: AIInsight[];
-  decisions: Decision[];
-  cashflowTrend: CashflowPoint[];
-  kpiTable: KPI[];
-  triggers: Trigger[];
+  period: string;
+  updated: string;
+  focusYear: number;
+  years: number[];
   summary: Summary;
+  funnel: FunnelStage[];
+  monthly: MonthPoint[];
+  projects: ProjectFin[];
+  banks: BankFin[];
+  sales: SalesRank[];
+  payMix: PayMethod[];
+  pipeline: PipelineRow[];
+  akads: AkadRow[];
+  alerts: Alert[];
+  ai: AIInsight[];
+  decisions: Decision[];
+  kpis: KPI[];
+  triggers: Trigger[];
 }
 
-/** Dashboard enriched on the client with key->item lookup maps for the meta arrays. */
-export interface DashboardData extends Dashboard {
-  receivableTypeMap: Record<string, MetaItem>;
-  agingMap: Record<string, MetaItem>;
-  priorityMap: Record<string, MetaItem>;
+/* ---- ingest (async) types ---- */
+
+export interface ImportSummary {
+  akadCount: number;
+  nilaiAkad: number;
+  cashIn: number;
+  bookingCount: number;
+  prosesCount: number;
+  batalCount: number;
+  kprShare: number;
+  issues: number;
+}
+
+export interface SheetInfo {
+  name: string;
+  kind: "akad" | "pipeline" | "skipped";
+  rows: number;
+}
+
+export interface ImportResult {
+  preview: Dashboard;
+  headline: ImportSummary;
+  issues: string[];
+  sheets: SheetInfo[];
+}
+
+export interface ImportRecord {
+  id: string;
+  time: string;
+  filename: string;
+  by: string;
+  summary: ImportSummary;
+}
+
+export interface AutoSyncStatus {
+  enabled: boolean;
+  intervalSec: number;
+  configured: boolean;
+  lastSync: string;
+  lastError: string;
+  lastSummary: ImportSummary;
 }
 
 /** Authenticated account (mirrors backend domain.User, no password material). */

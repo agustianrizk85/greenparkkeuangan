@@ -607,3 +607,117 @@ table.big td.num { font-family: var(--font-mono); }
 .modal-x:hover { background: rgba(255,255,255,.22); }
 .modal-body { padding: 20px 22px; overflow-y: auto; }
 .modal-body.adm-form { border: none; border-radius: 0; box-shadow: none; background: transparent; }
+
+/* ============================================================
+   Akad/KPR dashboard — content layout (added 2026-06-19)
+   ============================================================ */
+
+.empty-mini { color: var(--ink-3); font-size: 13px; padding: 18px 6px; text-align: center; }
+
+/* Row lists (projects, banks, sales, paymix, pipeline) */
+.rows { display: flex; flex-direction: column; gap: 6px; }
+.row {
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center;
+  gap: 10px; padding: 7px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--panel-2); font-size: 13px; text-align: left; width: 100%;
+}
+.row.click { cursor: pointer; }
+.row.click:hover { border-color: var(--green-600); background: var(--ok-bg); }
+.row-rank { font-family: var(--font-mono); color: var(--ink-3); font-weight: 700; width: 18px; }
+.row-name { font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; min-width: 0; }
+.row-sub { color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
+.row-val { font-family: var(--font-mono); font-weight: 700; color: var(--ink); white-space: nowrap; }
+.row-note { color: var(--ink-2); font-size: 11.5px; grid-column: 2 / -1; }
+
+/* Funnel */
+.funnel { display: flex; flex-direction: column; gap: 8px; }
+.fn-row { display: grid; grid-template-columns: 120px 1fr auto auto; gap: 10px; align-items: center; }
+.fn-label { font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.fn-val { font-family: var(--font-mono); font-weight: 700; }
+.fn-conv { font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); width: 40px; text-align: right; }
+
+/* AI + decisions */
+.ai-list { display: flex; flex-direction: column; gap: 8px; }
+.ai-item { display: flex; gap: 8px; align-items: flex-start; }
+.ai-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+.dec-list { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.dec-item { display: flex; gap: 8px; font-size: 12.5px; }
+.dec-role { font-weight: 700; color: var(--green-700); min-width: 84px; }
+.dec-text { color: var(--ink-2); }
+.focus-ai h4 { margin: 16px 0 6px; font-family: var(--font-display); }
+
+/* Alerts */
+.alert-list { display: flex; flex-direction: column; gap: 8px; }
+.alert-item { border: 1px solid var(--line); border-left: 3px solid var(--ink-3); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--panel-2); }
+.alert-item.red { border-left-color: var(--bad); background: var(--bad-bg); }
+.alert-item.orange { border-left-color: var(--orange); background: var(--orange-bg); }
+.alert-item.yellow { border-left-color: var(--warn); background: var(--warn-bg); }
+.alert-item.green { border-left-color: var(--ok); background: var(--ok-bg); }
+.alert-detail { font-size: 12.5px; color: var(--ink-2); margin: 4px 0; line-height: 1.4; }
+.alert-action { font-size: 12px; color: var(--green-700); font-weight: 600; }
+
+/* Focus tables */
+.ftable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ftable th, .ftable td { padding: 7px 9px; border-bottom: 1px solid var(--line); text-align: left; }
+.ftable th { color: var(--ink-3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+.ftable td.num, .ftable th.num { text-align: right; font-family: var(--font-mono); }
+.ftable tbody tr:hover { background: var(--panel-2); }
+
+/* Project detail modal */
+.pd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.pd-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); align-items: center; }
+.pd-note { margin-top: 10px; color: var(--ink-2); font-size: 13px; }
+
+/* ============================================================
+   Import / sync panel
+   ============================================================ */
+.imp { display: flex; flex-direction: column; gap: 14px; }
+.imp-title { font-family: var(--font-display); font-size: 17px; margin: 0 0 4px; }
+.imp-sub { color: var(--ink-3); font-size: 12.5px; margin: 0; line-height: 1.5; }
+.imp-drop { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--panel-2); }
+.imp-sync { white-space: nowrap; }
+.imp-reset { margin-left: auto; }
+.imp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.imp-panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.imp-panel-h { padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 12.5px; color: var(--green-700); }
+.imp-panel-b { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.imp-metric { display: flex; justify-content: space-between; font-size: 13px; }
+.imp-metric-l { color: var(--ink-2); }
+.imp-metric-v { font-family: var(--font-mono); font-weight: 600; }
+.imp-metric-v.strong { color: var(--green-700); font-weight: 800; }
+.imp-rows { display: flex; flex-wrap: wrap; gap: 6px; }
+.imp-chip { font-size: 11.5px; padding: 3px 8px; border-radius: 20px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); }
+.imp-chip-akad { border-color: var(--ok); background: var(--ok-bg); }
+.imp-chip-pipeline { border-color: var(--warn); background: var(--warn-bg); }
+.imp-chip-skipped { opacity: .6; }
+.imp-valid { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.imp-valid-h { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; background: var(--panel-2); border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+.imp-badges { display: flex; gap: 6px; margin-left: auto; }
+.imp-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.imp-badge.warn { background: var(--warn-bg); border-color: var(--warn); }
+.imp-badge.err { background: var(--bad-bg); border-color: var(--bad); }
+.imp-badge.zero { opacity: .6; }
+.imp-issues { max-height: 240px; overflow-y: auto; }
+.imp-issue { padding: 6px 12px; border-top: 1px solid var(--line); font-size: 12px; }
+.imp-issue.warning { background: var(--warn-bg); }
+.imp-issue-empty { padding: 10px 12px; color: var(--ink-3); font-size: 12.5px; }
+.imp-actions { display: flex; gap: 10px; align-items: center; }
+.imp-auto { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); flex-wrap: wrap; }
+.imp-auto.on { border-color: var(--ok); background: var(--ok-bg); }
+.imp-auto-title { font-weight: 700; font-size: 13px; display: block; }
+.imp-auto-sub { font-size: 11.5px; color: var(--ink-3); }
+.imp-auto-err { color: var(--bad); }
+.imp-auto-ctl { display: flex; gap: 10px; align-items: center; }
+.imp-auto-sel { font-size: 12px; color: var(--ink-2); display: flex; gap: 6px; align-items: center; }
+.imp-auto-sel select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); }
+.imp-toggle { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; font-weight: 700; font-size: 12px; }
+.imp-toggle.on { background: var(--green-600); color: #fff; border-color: var(--green-600); }
+.imp-toggle-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); }
+.imp-toggle.on .imp-toggle-dot { background: #fff; }
+.imp-history { border-top: 1px solid var(--line); padding-top: 12px; }
+.imp-history-h { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.imp-hrow { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.imp-hfile { font-weight: 600; }
+.imp-hmeta { color: var(--ink-3); font-size: 11px; display: block; }
+.imp-hsum { color: var(--ink-2); font-family: var(--font-mono); font-size: 11.5px; }
+.imp-roll { padding: 3px 10px; }

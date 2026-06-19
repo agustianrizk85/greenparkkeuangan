@@ -1,287 +1,207 @@
 import type {
   AIInsight,
-  CashflowPoint,
+  Alert,
+  BankFin,
   Decision,
-  Facility,
-  MetaItem,
-  Payable,
-  Project,
-  Receivable,
+  FunnelStage,
+  MonthPoint,
+  PayMethod,
+  PipelineRow,
+  ProjectFin,
+  SalesRank,
   Summary,
 } from "../types";
-import { rp, statusVar } from "../lib/status";
+import { rp, toneClass } from "../lib/status";
 import { Bar, Kpi, Panel, Pill, Stat, StatusPill } from "./ui";
-import { Icon } from "./Icon";
-import { CashflowChart } from "./CashflowChart";
+import { MonthlyChart } from "./CashflowChart";
 
-/* A. Executive KPI row -------------------------------------------------- */
+const num = (n: number) => n.toLocaleString("id-ID");
+
+/** Compact empty placeholder for a panel with no data yet. */
+function Empty({ label }: { label: string }) {
+  return <div className="empty-mini">{label}</div>;
+}
+
+/* ---- Top scorecard ---------------------------------------------------- */
 export function KpiRow({ s }: { s: Summary }) {
-  const runwayTone = s.runway >= 6 ? "ok" : s.runway >= 3 ? "warn" : "bad";
-  const collTone = s.collectionRate >= 90 ? "ok" : s.collectionRate >= 75 ? "warn" : "bad";
+  const cancelTone = s.cancelRate > 20 ? "bad" : s.cancelRate > 10 ? "warn" : "ok";
+  const achTone = s.achievement >= 95 ? "ok" : s.achievement >= 80 ? "warn" : "bad";
   return (
     <div className="kpi-row">
-      <Kpi label="Total Penjualan" value={rp(s.totalRevenue)} delta="nilai kontrak" />
-      <Kpi label="Posisi Kas" value={rp(s.cashPosition)} tone="ok" delta="cash on hand" />
-      <Kpi label="Collection Rate" value={s.collectionRate + "%"} tone={collTone} delta={rp(s.collected) + " tertagih"} deltaDir={collTone === "bad" ? "down" : "up"} />
-      <Kpi label="Piutang (AR)" value={rp(s.outstandingAR)} tone="warn" delta={s.critical + " macet >90h"} deltaDir="down" />
-      <Kpi label="Hutang (AP)" value={rp(s.outstandingAP)} tone="warn" delta="jatuh tempo" />
-      <Kpi label="Net Margin" value={s.netMargin + "%"} tone={s.netMargin >= 25 ? "ok" : "warn"} delta="gross tertimbang" />
-      <Kpi label="Cash Runway" value={s.runway} unit="bln" tone={runwayTone} delta="terhadap burn" />
-      <Kpi label="Risiko Koleksi" value={s.overdueRisk} tone="bad" delta={s.budgetAbsorption + "% serapan budget"} />
+      <Kpi label="Nilai Akad (Plafon)" value={rp(s.nilaiAkad)} tone="ok" />
+      <Kpi label="Cash-in DP" value={rp(s.cashIn)} />
+      <Kpi label="Akad" value={num(s.akadCount)} unit={s.targetAkad ? `/ ${num(s.targetAkad)}` : ""} tone={achTone} delta={s.targetAkad ? `${s.achievement}%` : undefined} />
+      <Kpi label="Booking Aktif" value={num(s.bookingCount)} unit={`≈ ${rp(s.pipelineValue)}`} tone="warn" />
+      <Kpi label="Rasio Batal" value={`${s.cancelRate}%`} tone={cancelTone} />
+      <Kpi label="KPR Share" value={`${s.kprShare}%`} unit={`${s.bankCount} bank`} />
     </div>
   );
 }
 
-/* Cashflow chart panel -------------------------------------------------- */
-export function CashflowPanel({ trend, onExpand }: { trend: CashflowPoint[]; onExpand: () => void }) {
+/* ---- Funnel ----------------------------------------------------------- */
+export function FunnelPanel({ funnel, onExpand }: { funnel: FunnelStage[]; onExpand?: () => void }) {
+  const top = funnel[0]?.count || 1;
   return (
-    <Panel tag="ARUS KAS" title="Cash Flow Control" sub="Kas Masuk vs Kas Keluar" onExpand={onExpand}>
-      <div className="chart-wrap">
-        <div className="chart-legend">
-          <span className="l-act">
-            <i />
-            Kas Masuk (inflow)
-          </span>
-          <span className="l-plan">
-            <i />
-            Kas Keluar (outflow)
-          </span>
-          <span style={{ marginLeft: "auto", color: "var(--ink-3)", fontWeight: 500 }}>skala: Rp miliar</span>
+    <Panel tag="PIPELINE" title="Funnel Booking → Akad" sub="proses KPR" onExpand={onExpand}>
+      {funnel.length === 0 ? (
+        <Empty label="Belum ada data pipeline." />
+      ) : (
+        <div className="funnel">
+          {funnel.map((st, i) => {
+            const prev = i > 0 ? funnel[i - 1].count : st.count;
+            const conv = prev > 0 ? Math.round((st.count / prev) * 100) : 100;
+            return (
+              <div className="fn-row" key={st.key}>
+                <span className="fn-label">{st.label}</span>
+                <Bar value={st.count} max={top} tone={st.key === "akad" ? "green" : "yellow"} />
+                <span className="fn-val">{num(st.count)}</span>
+                {i > 0 && <span className="fn-conv">{conv}%</span>}
+              </div>
+            );
+          })}
         </div>
-        <CashflowChart trend={trend} />
-      </div>
+      )}
     </Panel>
   );
 }
 
-/* B. Project P&L Table -------------------------------------------------- */
+/* ---- Monthly akad trend ---------------------------------------------- */
+export function MonthlyPanel({ monthly, onExpand }: { monthly: MonthPoint[]; onExpand?: () => void }) {
+  return (
+    <Panel tag="TREN" title="Akad per Bulan" sub="nilai (—) vs DP (- -), Rp miliar" onExpand={onExpand}>
+      <MonthlyChart monthly={monthly} />
+    </Panel>
+  );
+}
+
+/* ---- Projects --------------------------------------------------------- */
 export function ProjectPanel({
   projects,
   onExpand,
   onRow,
 }: {
-  projects: Project[];
-  onExpand: () => void;
-  onRow: (p: Project) => void;
+  projects: ProjectFin[];
+  onExpand?: () => void;
+  onRow?: (p: ProjectFin) => void;
 }) {
   return (
-    <Panel tag="PROYEK" title="Project P&L Control" sub={`${projects.length} proyek`} onExpand={onExpand}>
-      <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Proyek</th>
-              <th style={{ textAlign: "right" }}>Penjualan</th>
-              <th style={{ textAlign: "right" }}>Serapan</th>
-              <th style={{ width: 90 }}>Tertagih</th>
-              <th style={{ textAlign: "right" }}>Margin</th>
-              <th>Status</th>
-              <th>Catatan Kas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p) => {
-              const collPct = p.revenue > 0 ? Math.round((p.collected / p.revenue) * 100) : 0;
-              const absorb = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
-              return (
-                <tr key={p.id} className="clickable" onClick={() => onRow(p)}>
-                  <td className="row-accent" style={{ background: `var(--${statusVar(p.status)})` }}></td>
-                  <td className="name">
-                    {p.name}
-                    <div style={{ fontSize: 10, color: "var(--ink-3)", fontWeight: 500 }}>{p.pic}</div>
-                  </td>
-                  <td className="num">{rp(p.revenue)}</td>
-                  <td className="num" style={{ color: absorb > 90 ? "var(--bad)" : "var(--ink-2)" }}>{absorb}%</td>
-                  <td>
-                    <Bar value={collPct} tone={p.status} />
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--ink-3)" }}>{collPct}%</span>
-                  </td>
-                  <td
-                    className="num"
-                    style={{ color: p.margin >= 25 ? "var(--green-700)" : p.margin >= 20 ? "var(--warn)" : "var(--bad)", fontWeight: 600 }}
-                  >
-                    {p.margin}%
-                  </td>
-                  <td>
-                    <StatusPill status={p.status} />
-                  </td>
-                  <td style={{ fontSize: 11, color: "var(--ink-2)" }}>{p.cashNote}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <Panel tag="PROYEK" title="Akad per Proyek" sub={`${projects.length} proyek`} onExpand={onExpand}>
+      {projects.length === 0 ? (
+        <Empty label="Belum ada data proyek." />
+      ) : (
+        <div className="rows">
+          {projects.slice(0, 7).map((p) => (
+            <button className="row click" key={p.code} onClick={() => onRow?.(p)}>
+              <StatusPill status={p.status} />
+              <span className="row-name">{p.name}</span>
+              <span className="row-sub">{p.akad} akad · {p.kprPct}% KPR</span>
+              <span className="row-val">{rp(p.nilai)}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }
 
-/* C. Receivables (AR) aging --------------------------------------------- */
-export function ReceivablePanel({
-  receivables,
-  agingMap,
-  typeMap,
-  onExpand,
-}: {
-  receivables: Receivable[];
-  agingMap: Record<string, MetaItem>;
-  typeMap: Record<string, MetaItem>;
-  onExpand: () => void;
-}) {
-  const cnt = { current: 0, d30: 0, d60: 0, d90: 0 } as Record<string, number>;
-  const sum = { current: 0, d30: 0, d60: 0, d90: 0 } as Record<string, number>;
-  receivables.forEach((r) => {
-    cnt[r.bucket] = (cnt[r.bucket] ?? 0) + 1;
-    sum[r.bucket] = (sum[r.bucket] ?? 0) + r.amount;
-  });
+/* ---- Banks (Pendanaan) ------------------------------------------------ */
+export function BankPanel({ banks, onExpand }: { banks: BankFin[]; onExpand?: () => void }) {
+  const max = banks[0]?.plafon || 1;
   return (
-    <Panel tag="PIUTANG" title="Receivables (AR) Aging" sub="koleksi konsumen" accent="var(--warn)" onExpand={onExpand}>
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(4,1fr)", marginBottom: 10 }}>
-        <Stat label="Lancar" value={rp(sum.current)} tone="ok" />
-        <Stat label="1–30h" value={rp(sum.d30)} tone="warn" />
-        <Stat label="31–60h" value={rp(sum.d60)} />
-        <Stat label=">90h" value={rp(sum.d90)} tone="bad" />
-      </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Konsumen</th>
-              <th>Tipe</th>
-              <th style={{ textAlign: "right" }}>Nilai</th>
-              <th style={{ textAlign: "right" }}>Aging</th>
-              <th>Bucket</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receivables.map((r) => (
-              <tr key={r.id}>
-                <td className="num">{r.id}</td>
-                <td className="name" style={{ whiteSpace: "nowrap" }}>
-                  {r.customer}
-                  <div style={{ fontSize: 10, color: "var(--ink-3)", fontWeight: 500 }}>{r.project}</div>
-                </td>
-                <td>
-                  <Pill tone={typeMap[r.type].tone} dot={false}>
-                    {typeMap[r.type].label}
-                  </Pill>
-                </td>
-                <td className="num">{rp(r.amount)}</td>
-                <td
-                  className="num"
-                  style={{ color: r.aging > 90 ? "var(--bad)" : r.aging > 30 ? "var(--warn)" : "var(--ink-2)", fontWeight: 600 }}
-                >
-                  {r.aging > 0 ? r.aging + "h" : "—"}
-                </td>
-                <td>
-                  <Pill tone={agingMap[r.bucket].tone} dot={false}>
-                    {agingMap[r.bucket].label}
-                  </Pill>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
-/* D. Payables (AP) ------------------------------------------------------ */
-export function PayablePanel({
-  payables,
-  priorityMap,
-  onExpand,
-}: {
-  payables: Payable[];
-  priorityMap: Record<string, MetaItem>;
-  onExpand: () => void;
-}) {
-  const total = payables.reduce((s, p) => s + p.amount, 0);
-  const overdue = payables.filter((p) => p.status === "overdue").reduce((s, p) => s + p.amount, 0);
-  const high = payables.filter((p) => p.priority === "high").reduce((s, p) => s + p.amount, 0);
-  return (
-    <Panel tag="HUTANG" title="Payables (AP) Control" sub="kewajiban vendor" accent="var(--orange)" onExpand={onExpand}>
-      <div className="stat-grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginBottom: 10 }}>
-        <Stat label="Total Hutang" value={rp(total)} />
-        <Stat label="Jatuh Tempo" value={rp(overdue)} tone="bad" />
-        <Stat label="Prioritas Tinggi" value={rp(high)} tone="warn" />
-      </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Vendor</th>
-              <th>Kategori</th>
-              <th style={{ textAlign: "right" }}>Nilai</th>
-              <th style={{ textAlign: "right" }}>Tempo</th>
-              <th>Prioritas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payables.map((p) => (
-              <tr key={p.id}>
-                <td className="name" style={{ whiteSpace: "nowrap" }}>
-                  {p.vendor}
-                  <div style={{ fontSize: 10, color: "var(--ink-3)", fontWeight: 500 }}>{p.project}</div>
-                </td>
-                <td style={{ fontSize: 11 }}>{p.category}</td>
-                <td className="num">{rp(p.amount)}</td>
-                <td
-                  className="num"
-                  style={{ color: p.dueDays < 0 ? "var(--bad)" : p.dueDays <= 3 ? "var(--warn)" : "var(--ink-2)", fontWeight: 600 }}
-                >
-                  {p.dueDays < 0 ? Math.abs(p.dueDays) + "h lewat" : p.dueDays + "h"}
-                </td>
-                <td>
-                  <Pill tone={priorityMap[p.priority].tone} dot={false}>
-                    {priorityMap[p.priority].label}
-                  </Pill>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
-/* E. Funding / Facilities ----------------------------------------------- */
-export function FundingPanel({ facilities, onExpand }: { facilities: Facility[]; onExpand: () => void }) {
-  return (
-    <Panel tag="PENDANAAN" title="Funding & Facilities" sub="fasilitas bank" accent="var(--navy-600)" onExpand={onExpand}>
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 9 }}>
-        {facilities.map((f) => {
-          const usedPct = f.plafond > 0 ? Math.round((f.used / f.plafond) * 100) : 0;
-          return (
-            <div key={f.name} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <Pill tone="neutral" dot={false}>
-                  {f.type}
-                </Pill>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>{f.name}</span>
-                <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 11.5, fontWeight: 600, color: usedPct > 90 ? "var(--bad)" : usedPct > 75 ? "var(--warn)" : "var(--green-700)" }}>
-                  {usedPct}%
-                </span>
-              </div>
-              <Bar value={usedPct} tone={f.status} />
-              <div style={{ display: "flex", gap: 14, fontSize: 10.5, color: "var(--ink-3)", fontFamily: "var(--font-mono)" }}>
-                <span>Terpakai {rp(f.used)}</span>
-                <span>Plafond {rp(f.plafond)}</span>
-                <span style={{ marginLeft: "auto" }}>{f.rate ? f.rate + "% · " + f.tenor : f.tenor}</span>
-              </div>
+    <Panel tag="PENDANAAN" title="Plafond KPR per Bank" sub={`${banks.length} bank`} onExpand={onExpand}>
+      {banks.length === 0 ? (
+        <Empty label="Belum ada akad KPR." />
+      ) : (
+        <div className="rows">
+          {banks.slice(0, 6).map((b) => (
+            <div className="row" key={b.name}>
+              <span className="row-name">{b.name}</span>
+              <Bar value={b.plafon} max={max} tone="green" />
+              <span className="row-sub">{b.share}% · {b.akad} akad</span>
+              <span className="row-val">{rp(b.plafon)}</span>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }
 
-/* F + G. AI Insights & Critical Decision -------------------------------- */
+/* ---- Sales ranking ---------------------------------------------------- */
+export function SalesPanel({ sales, onExpand }: { sales: SalesRank[]; onExpand?: () => void }) {
+  return (
+    <Panel tag="SALES" title="Kontribusi Akad — Sales" sub={`${sales.length} kontributor`} onExpand={onExpand}>
+      {sales.length === 0 ? (
+        <Empty label="Belum ada data sales." />
+      ) : (
+        <div className="rows">
+          {sales.slice(0, 7).map((s, i) => (
+            <div className="row" key={s.name + i}>
+              <span className="row-rank">{i + 1}</span>
+              <span className="row-name">
+                {s.name} {s.isAgent && <Pill tone="orange" dot={false}>Agent</Pill>}
+              </span>
+              <span className="row-sub">{s.akad} akad</span>
+              <span className="row-val">{rp(s.nilai)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ---- Payment mix ------------------------------------------------------ */
+export function PayMixPanel({ payMix, onExpand }: { payMix: PayMethod[]; onExpand?: () => void }) {
+  const total = payMix.reduce((a, p) => a + p.count, 0) || 1;
+  const tone = (t: string) => (t === "KPR" ? "green" : t === "Cash Keras" ? "yellow" : "orange");
+  return (
+    <Panel tag="CARA BAYAR" title="Skema Pembayaran" sub={`${num(total)} akad`} onExpand={onExpand}>
+      {payMix.length === 0 ? (
+        <Empty label="Belum ada data." />
+      ) : (
+        <div className="rows">
+          {payMix.map((p) => (
+            <div className="row" key={p.type}>
+              <Pill tone={tone(p.type)} dot>{p.type}</Pill>
+              <Bar value={p.count} max={total} tone={p.type === "KPR" ? "green" : "yellow"} />
+              <span className="row-sub">{Math.round((p.count / total) * 100)}%</span>
+              <span className="row-val">{num(p.count)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ---- Pipeline early-warning ------------------------------------------ */
+const SLA_TONE = { overdue: "red", due: "yellow", ok: "green" } as const;
+
+export function PipelinePanel({ pipeline, onExpand }: { pipeline: PipelineRow[]; onExpand?: () => void }) {
+  pipeline = pipeline ?? [];
+  const flagged = pipeline.filter((r) => r.kendala).length;
+  return (
+    <Panel tag="EARLY WARNING" title="Pipeline Tertahan" sub={`${flagged} berkendala`} accent="var(--bad)" onExpand={onExpand}>
+      {pipeline.length === 0 ? (
+        <Empty label="Tidak ada booking aktif tertahan." />
+      ) : (
+        <div className="rows">
+          {pipeline.slice(0, 7).map((r, i) => (
+            <div className="row" key={r.customer + i}>
+              <Pill tone={SLA_TONE[r.sla]} dot>{r.stage}</Pill>
+              <span className="row-name">{r.customer}</span>
+              <span className="row-sub">{r.project} · {r.bank || r.caraBayar}</span>
+              <span className="row-note">{r.kendala || "—"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ---- AI + decisions --------------------------------------------------- */
 export function AiDecisionPanel({
   insights,
   decisions,
@@ -289,43 +209,50 @@ export function AiDecisionPanel({
 }: {
   insights: AIInsight[];
   decisions: Decision[];
-  onExpand: () => void;
+  onExpand?: () => void;
 }) {
   return (
-    <Panel tag="AI" title="AI Insights & Decision" sub="apa yang diwaspadai hari ini" accent="var(--navy-600)" onExpand={onExpand}>
-      <div className="ai-list" style={{ maxHeight: "52%", flex: "0 1 auto" }}>
+    <Panel tag="AI" title="AI Insight & Keputusan" sub="war-room" onExpand={onExpand}>
+      <div className="ai-list">
         {insights.slice(0, 4).map((a, i) => (
-          <div className={`ai-card ${a.tone}`} key={i}>
-            <span className="ai-ico">
-              <Icon name={a.icon} size={15} />
-            </span>
-            <div className="ai-tx">
-              <div className="ai-ty">{a.type}</div>
-              <div className="ai-ms">{a.text}</div>
-            </div>
+          <div className="ai-item" key={i}>
+            <Pill tone={toneClass(a.tone)} dot>{a.type}</Pill>
+            <span className="ai-text">{a.text}</span>
           </div>
         ))}
       </div>
-      <div
-        style={{
-          fontSize: 10.5,
-          fontWeight: 700,
-          color: "var(--ink-3)",
-          textTransform: "uppercase",
-          letterSpacing: ".04em",
-          margin: "11px 0 7px",
-        }}
-      >
-        Critical Decision Box
-      </div>
-      <div className="dec-box" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        {decisions.map((d, i) => (
-          <div className={`dec ${d.tone}`} key={i}>
-            <span className="drole">{d.role}</span>
-            <span className="dtx">{d.text}</span>
+      {decisions.length > 0 && (
+        <div className="dec-list">
+          {decisions.slice(0, 4).map((d, i) => (
+            <div className="dec-item" key={i}>
+              <span className="dec-role">{d.role}</span>
+              <span className="dec-text">{d.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ---- Alerts ----------------------------------------------------------- */
+export function AlertPanel({ alerts, onExpand }: { alerts: Alert[]; onExpand?: () => void }) {
+  return (
+    <Panel tag="ALERT" title="Alarm Keuangan" sub={`${alerts.length}`} accent="var(--bad)" onExpand={onExpand}>
+      <div className="alert-list">
+        {alerts.map((a, i) => (
+          <div className={`alert-item ${a.tone}`} key={i}>
+            <div className="alert-h">
+              <Pill tone={toneClass(a.tone)} dot>{a.title}</Pill>
+            </div>
+            <div className="alert-detail">{a.detail}</div>
+            <div className="alert-action">→ {a.action}</div>
           </div>
         ))}
       </div>
     </Panel>
   );
 }
+
+/* Re-export Stat for focus views. */
+export { Stat };
