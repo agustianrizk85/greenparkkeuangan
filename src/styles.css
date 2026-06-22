@@ -263,6 +263,67 @@ body {
 .panel-bd { flex: 1; min-height: 0; overflow: hidden; padding: 12px 15px; display: flex; flex-direction: column; }
 .panel-bd.scroll { overflow-y: auto; }
 
+
+/* ---- Info tooltip (ⓘ data-source / business-process marker on each card) --
+ * The icon sits inside the card; the bubble is portaled to <body> with fixed
+ * positioning (class .kfin-tip) so a card's overflow:hidden can NEVER clip it.
+ * JS flips it above the icon near the viewport bottom. */
+.infotip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 0;
+  color: var(--ink-3);
+  cursor: help;
+}
+.infotip:hover,
+.infotip:focus-visible { color: var(--green-600); outline: none; }
+
+.kfin-tip {
+  position: fixed;
+  z-index: 9999;
+  width: 260px;
+  box-sizing: border-box;
+  background: #102a4c;
+  color: #d6e2f0;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 9px;
+  padding: 11px 13px;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .38);
+  pointer-events: none;
+  animation: kfin-tip-in .12s ease both;
+}
+.kfin-tip.flip { transform: translateY(-100%); }
+@keyframes kfin-tip-in { from { opacity: 0; } to { opacity: 1; } }
+
+.kfin-tip-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border: 6px solid transparent;
+}
+.kfin-tip:not(.flip) .kfin-tip-arrow { bottom: 100%; border-bottom-color: #102a4c; }
+.kfin-tip.flip .kfin-tip-arrow { top: 100%; border-top-color: #102a4c; }
+
+.kfin-tip-row { display: block; }
+.kfin-tip-row + .kfin-tip-row { margin-top: 7px; }
+.kfin-tip-row b {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #7fe3b4;
+  margin-bottom: 2px;
+}
+
 /* ---- Tables ----------------------------------------------------------- */
 table.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.tbl th {
