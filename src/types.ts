@@ -168,6 +168,97 @@ export interface Dashboard {
   triggers: Trigger[];
 }
 
+/* ---- procurement (PR / pembelian) types ---- */
+
+export interface PurchaseDoc {
+  doc: string;
+  tanggal: string;
+  nomor: string;
+  pemasok: string;
+  kode: string;
+  barang: string;
+  qty: number;
+  satuan: string;
+  diskon: number;
+  total: number;
+  blok: string;
+  proyek: string;
+  bulan: string;
+  tahun: number;
+}
+
+export interface PaymentDoc {
+  tanggal: string;
+  noBukti: string;
+  pemasok: string;
+  bank: string;
+  noFaktur: string;
+  totalFaktur: number;
+  terutang: number;
+  bayar: number;
+  bulan: string;
+  tahun: number;
+}
+
+export interface PurchasingSummary {
+  poValue: number;
+  poCount: number;
+  invoiceValue: number;
+  invoiceCount: number;
+  paidValue: number;
+  paymentCount: number;
+  outstanding: number;
+  supplierCount: number;
+  topSupplier: string;
+}
+
+export interface SupplierSpend {
+  name: string;
+  poValue: number;
+  invoiced: number;
+  paid: number;
+  outstanding: number;
+  docs: number;
+}
+
+export interface ProjectSpend {
+  project: string;
+  poValue: number;
+  items: number;
+}
+
+export interface PurchaseMonth {
+  period: string;
+  po: number;
+  invoice: number;
+  paid: number;
+}
+
+/** Procurement section — fed by the "Pembelian (PR)" spreadsheet (own sync). */
+export interface Purchasing {
+  updated: string;
+  summary: PurchasingSummary;
+  bySupplier: SupplierSpend[];
+  byProject: ProjectSpend[];
+  monthly: PurchaseMonth[];
+  orders: PurchaseDoc[];
+  invoices: PurchaseDoc[];
+  payments: PaymentDoc[];
+}
+
+/** Result of POST /api/purchasing/sync-preview. */
+export interface PRResult {
+  purchasing: Purchasing;
+  sheets: SheetInfo[];
+  issues: string[];
+}
+
+/** Configured procurement input spreadsheet (GET /api/purchasing/sheet). */
+export interface PRSheetConfig {
+  sheet: string;
+  url: string;
+}
+
 /* ---- ingest (async) types ---- */
 
 export interface ImportSummary {
@@ -183,7 +274,7 @@ export interface ImportSummary {
 
 export interface SheetInfo {
   name: string;
-  kind: "akad" | "pipeline" | "skipped";
+  kind: "akad" | "pipeline" | "pr_po" | "pr_invoice" | "pr_payment" | "skipped";
   rows: number;
 }
 

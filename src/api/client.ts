@@ -4,6 +4,9 @@ import type {
   ImportRecord,
   ImportResult,
   LoginResponse,
+  PRResult,
+  PRSheetConfig,
+  Purchasing,
   User,
 } from "../types";
 
@@ -101,6 +104,13 @@ export const api = {
   // ---- ingest: Google Sheets sync ----
   syncPreview: () => req<ImportResult>("POST", "/import/sync-preview"),
   syncApprove: () => req<ImportRecord>("POST", "/import/sync-approve"),
+
+  // ---- procurement (PR / pembelian) — independent async sync ----
+  purchasing: () => req<Purchasing>("GET", "/purchasing"),
+  prSheetGet: () => req<PRSheetConfig>("GET", "/purchasing/sheet"),
+  prSheetSet: (url: string) => req<PRSheetConfig>("PUT", "/purchasing/sheet", { url }),
+  purchasingSyncPreview: () => req<PRResult>("POST", "/purchasing/sync-preview"),
+  purchasingSyncApprove: () => req<Purchasing>("POST", "/purchasing/sync-approve"),
 
   // ---- auto-sync ----
   autoStatus: () => req<AutoSyncStatus>("GET", "/import/auto"),

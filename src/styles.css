@@ -750,7 +750,13 @@ table.big td.num { font-family: var(--font-mono); }
 .imp-chip { font-size: 11.5px; padding: 3px 8px; border-radius: 20px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); }
 .imp-chip-akad { border-color: var(--ok); background: var(--ok-bg); }
 .imp-chip-pipeline { border-color: var(--warn); background: var(--warn-bg); }
+.imp-chip-pr_po { border-color: var(--accent, #3b82f6); background: rgba(59, 130, 246, .12); }
+.imp-chip-pr_invoice { border-color: #8b5cf6; background: rgba(139, 92, 246, .12); }
+.imp-chip-pr_payment { border-color: var(--ok); background: var(--ok-bg); }
 .imp-chip-skipped { opacity: .6; }
+.imp-sub-stamp { color: var(--ink-2); font-weight: 600; }
+.imp-sheetcfg { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.imp-sheet-in { flex: 1; min-width: 240px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel-2); color: var(--ink-1); font-size: 12.5px; }
 .imp-valid { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .imp-valid-h { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; background: var(--panel-2); border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
 .imp-badges { display: flex; gap: 6px; margin-left: auto; }

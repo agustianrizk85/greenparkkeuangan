@@ -11,6 +11,7 @@ import { Clock } from "./components/Clock";
 import { Icon } from "./components/Icon";
 import { Login } from "./components/Login";
 import { ImportPanel } from "./components/admin/ImportPanel";
+import { PurchasingPanel } from "./components/admin/PurchasingPanel";
 import {
   AiDecisionPanel,
   AlertPanel,
@@ -94,6 +95,7 @@ function AuthedApp({ auth }: { auth: Auth }) {
         <AdminHeader auth={auth} onBack={() => setView("dash")} />
         <div className="body">
           <ImportPanel reload={reload} />
+          <PurchasingPanel reload={reload} />
         </div>
       </>
     );
